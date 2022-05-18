@@ -2,7 +2,7 @@
 
 A clean and simple orderbook utilising Coinbase API Websocket feed.
 
-![Basic Coinbase Orderbook](/assets/img/sample.jpg "Coinbase Orderbook")
+![Basic Coinbase Orderbook](/img/sample.png)
 
 ## Description
 
