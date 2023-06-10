@@ -1,0 +1,30 @@
+<div class="orderbook-container d-flex align-items-center justify-content-center">
+    <h3 class="orderbook-head">Orderbook</h3>
+    <mat-form-field>
+        <mat-select [value]="selectedProduct" (selectionChange)="updateProduct($event)">
+            <mat-option *ngFor="let prod of products" [value]="prod">
+                {{ prod }}
+            </mat-option>
+        </mat-select>
+    </mat-form-field>
+    <div class="row">
+        <ng-container *ngFor="let display of displayTables">
+            <mat-table #table [dataSource]="display" class="m-1">
+                <ng-container matColumnDef="price">
+                    <mat-header-cell *matHeaderCellDef mat-header> Price ({{currency}})</mat-header-cell>
+                    <mat-cell *matCellDef="let element" ngClass="{{element?.asks ? 'red-text' : 'green-text'}}">
+                        {{element?.price}} </mat-cell>
+                </ng-container>
+    
+                <ng-container matColumnDef="size">
+                    <mat-header-cell *matHeaderCellDef mat-header> Size ({{product}}) </mat-header-cell>
+                    <mat-cell *matCellDef="let element">
+                        {{element?.size}} </mat-cell>
+                </ng-container>
+    
+                <mat-header-row *matHeaderRowDef="displayedColumns"></mat-header-row>
+                <mat-row *matRowDef="let row; columns: displayedColumns;"></mat-row>
+            </mat-table>
+        </ng-container>
+    </div>
+</div>

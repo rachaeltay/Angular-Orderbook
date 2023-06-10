@@ -1,11 +1,14 @@
-/* To learn more about this file see: https://angular.io/config/tsconfig. */
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "outDir": "./out-tsc/spec",
+    "module": "CommonJs",
     "types": [
-      "jasmine"
-    ]
+      "jest",
+      "node"
+    ],
+    "esModuleInterop": true, // reduce warning from Jest
+    "emitDecoratorMetadata": true // enable angular dependency injection to work with Jest
   },
   "files": [
     "src/test.ts",

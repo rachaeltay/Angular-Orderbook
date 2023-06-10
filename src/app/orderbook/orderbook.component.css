@@ -1,0 +1,33 @@
+.orderbook-container {
+  display: flex;
+  flex-direction: column;
+  min-width: 500px;
+}
+
+.mat-table {
+  width: 30%;
+  min-width: 250px;
+  min-height: 500px;
+  background-color: transparent;
+}
+
+.mat-header-cell {
+    color: rgba(255, 255, 255, 0.54);
+}
+
+.red-text {
+    color: #FF3B69;
+}
+
+.green-text {
+    color: #02C77A;
+}
+
+.orderbook-title {
+  color: rgba(255, 255, 255, 0.54);
+}
+
+.orderbook-head {
+  color: white;
+  padding-top: 2%;
+}
