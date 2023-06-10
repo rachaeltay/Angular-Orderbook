@@ -2,7 +2,7 @@
 
 A clean dark theme live orderbook UI utilising Coinbase API Websocket feed
 
-![Basic Coinbase Orderbook](/img/sample.jpg "Coinbase Orderbook")
+![Basic Coinbase Orderbook](/img/sample.jpg)
 
 ## Description
 
