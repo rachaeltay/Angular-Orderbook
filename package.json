@@ -1,6 +1,9 @@
 {
   "name": "angular-orderbook",
   "version": "0.0.0",
+  "engines": {
+    "node": "16.x"
+  },
   "scripts": {
     "ng": "ng",
     "start": "ng serve",
@@ -56,12 +59,5 @@
     "karma-coverage": "~2.1.0",
     "prettier": "^2.5.1",
     "typescript": "~4.5.2"
-  },
-  "jest": {
-    "preset": "jest-preset-angular",
-    "setupFilesAfterEnv": [
-      "<rootDir>/setup-jest.ts"
-    ],
-    "globalSetup": "jest-preset-angular/global-setup"
   }
 }
