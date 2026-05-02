@@ -2,7 +2,9 @@ import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
 
 import { CoinbaseService, DisplayOrder } from '../_services/coinbase.service';
 import { MatSelectChange } from '@angular/material/select';
+import { UntilDestroy, untilDestroyed } from '@ngneat/until-destroy';
 
+@UntilDestroy()
 @Component({
   selector: 'app-orderbook',
   templateUrl: './orderbook.component.html',
@@ -25,15 +27,19 @@ export class OrderbookComponent implements OnInit {
     this.currency = 'USD';
     this.selectedProduct = 'ETH-USD';
     this.products = ['ETH-USD', 'SOL-USD', 'AAVE-USD'];
-
   }
 
   ngOnInit(): void {
     this.coinbaseService.initProduct();
-    this.coinbaseService.shareOrder.subscribe((v) => {
-      this.displayTables = [v.slice(0, 10), v.slice(-10)];
-      this.changeDetectorRefs.detectChanges();
-    });
+    this.coinbaseService.shareOrder
+      .pipe(untilDestroyed(this))
+      .subscribe((v) => {
+        this.displayTables = [
+          v.filter((order) => order.asks),
+          v.filter((order) => !order.asks)
+        ];
+        this.changeDetectorRefs.detectChanges();
+      });
   }
 
   updateProduct(event: MatSelectChange): void {

@@ -1,45 +1,42 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { HttpClientTestingModule } from '@angular/common/http/testing';
-import { OrderbookComponent } from './orderbook.component';
+import { BehaviorSubject } from 'rxjs';
 
-import { CoinbaseService } from '../_services/coinbase.service';
 import { MatSelectModule } from '@angular/material/select';
-import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
 import { MatTableModule } from '@angular/material/table';
+import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
+
+import { CoinbaseService, DisplayOrder } from '../_services/coinbase.service';
+import { OrderbookComponent } from './orderbook.component';
 
 describe('OrderbookComponent', () => {
   let component: OrderbookComponent;
   let fixture: ComponentFixture<OrderbookComponent>;
-
-  beforeEach(() =>
-    TestBed.configureTestingModule({
-      imports: [
-        HttpClientTestingModule,
-        MatSelectModule,
-        MatTableModule,
-        BrowserAnimationsModule,
-      ],
-      providers: [CoinbaseService]
-    })
-  );
-
-  it('initialise with the correct product', () => {
-    fixture.componentInstance.selectedProduct = 'ETH-USD';
-    expect(fixture.componentInstance.selectedProduct).toEqual('ETH-USD');
-  });
-
-  it('should be created', () => {
-    const service: CoinbaseService = TestBed.get(CoinbaseService);
-    expect(service).toBeTruthy();
-  });
+  let orderSubject: BehaviorSubject<DisplayOrder[]>;
+  let coinbaseService: {
+    shareOrder: ReturnType<BehaviorSubject<DisplayOrder[]>['asObservable']>;
+    initProduct: jest.Mock;
+    unsubscribeProduct: jest.Mock;
+  };
 
   beforeEach(async () => {
-    await TestBed.configureTestingModule({
-      declarations: [OrderbookComponent]
-    }).compileComponents();
-  });
+    orderSubject = new BehaviorSubject<DisplayOrder[]>([]);
+    coinbaseService = {
+      shareOrder: orderSubject.asObservable(),
+      initProduct: jest.fn(),
+      unsubscribeProduct: jest.fn()
+    };
 
-  beforeEach(() => {
+    await TestBed.configureTestingModule({
+      declarations: [OrderbookComponent],
+      imports: [MatSelectModule, MatTableModule, BrowserAnimationsModule],
+      providers: [
+        {
+          provide: CoinbaseService,
+          useValue: coinbaseService
+        }
+      ]
+    }).compileComponents();
+
     fixture = TestBed.createComponent(OrderbookComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
@@ -47,5 +44,22 @@ describe('OrderbookComponent', () => {
 
   it('should create', () => {
     expect(component).toBeTruthy();
+  });
+
+  it('should initialise with the default product', () => {
+    expect(component.selectedProduct).toEqual('ETH-USD');
+    expect(coinbaseService.initProduct).toHaveBeenCalledWith();
+  });
+
+  it('should split incoming orders into ask and bid tables', () => {
+    orderSubject.next([
+      new DisplayOrder(101, 2, true),
+      new DisplayOrder(99, 1, false)
+    ]);
+
+    expect(component.displayTables).toEqual([
+      [new DisplayOrder(101, 2, true)],
+      [new DisplayOrder(99, 1, false)]
+    ]);
   });
 });

@@ -3,10 +3,14 @@ import { WebSocketSubject, webSocket } from 'rxjs/webSocket';
 import { UntilDestroy, untilDestroyed } from '@ngneat/until-destroy';
 import { BehaviorSubject, Observable } from 'rxjs';
 
+type OrderSide = 'asks' | 'bids';
+
+const MINIMUM_VISIBLE_SIZE = 3.5e-7;
+
 interface CoinbaseMessage {
   type: string;
   product_ids: string[];
-  channels: string[];
+  channel: string;
 }
 
 export class DisplayOrder {
@@ -21,18 +25,20 @@ export class DisplayOrder {
   }
 }
 
-interface Snapshot {
-  type: string;
-  product_ids: string[];
-  asks: number[][];
-  bids: number[][];
+interface CoinbaseLevel2Message {
+  events?: CoinbaseLevel2Event[];
 }
 
-interface Update {
+interface CoinbaseLevel2Event {
   type: string;
   product_id: string;
-  changes: string[][];
-  date: string;
+  updates: CoinbaseLevel2Update[];
+}
+
+interface CoinbaseLevel2Update {
+  side: string;
+  price_level: string;
+  new_quantity: string;
 }
 
 @UntilDestroy()
@@ -40,36 +46,32 @@ interface Update {
   providedIn: 'root'
 })
 export class CoinbaseService {
-  public baseUrl: string = 'wss://ws-feed.exchange.coinbase.com';
-  displayOrder: BehaviorSubject<DisplayOrder[]>;
+  public readonly baseUrl: string = 'wss://advanced-trade-ws.coinbase.com';
+  private readonly displayOrder: BehaviorSubject<DisplayOrder[]>;
   public shareOrder: Observable<DisplayOrder[]>;
-  subject: WebSocketSubject<any>;
+  subject?: WebSocketSubject<any>;
   currentDisplay: DisplayOrder[];
-  data: { [action: string]: { [price: number]: DisplayOrder } };
-  price: { [action: string]: number[] };
+  data: Record<OrderSide, { [price: number]: DisplayOrder }>;
+  price: Record<OrderSide, number[]>;
 
   constructor() {
     this.displayOrder = new BehaviorSubject<DisplayOrder[]>([]);
     this.shareOrder = this.displayOrder.asObservable();
-    this.subject = webSocket(this.baseUrl);
     this.currentDisplay = [];
     this.data = { asks: {}, bids: {} };
     this.price = { asks: [], bids: [] };
   }
 
   public initProduct(product_id: string = 'ETH-USD'): void {
+    this.closeConnection();
+    this.resetData();
     this.subject = webSocket(this.baseUrl);
-    // unsubscribe when destroyed
     this.subject
       .asObservable()
       .pipe(untilDestroyed(this))
       .subscribe({
         next: (v) => {
-          if (v['type'] == 'snapshot') {
-            this.handleSnapshot(v);
-          } else if (v['type'] == 'l2update') {
-            this.update(v);
-          }
+          this.handleMessage(v);
         },
         error: (e) => console.error(e)
       });
@@ -80,63 +82,70 @@ export class CoinbaseService {
     this.send({
       type: 'subscribe',
       product_ids: [product_id],
-      channels: ['level2']
+      channel: 'level2'
     });
   }
 
   unsubscribeProduct(product_id: string): void {
-    this.resetData();
     this.send({
       type: 'unsubscribe',
       product_ids: [product_id],
-      channels: ['level2']
+      channel: 'level2'
     });
+    this.closeConnection();
+    this.resetData();
   }
 
   resetData(): void {
-    this.data = { asks: [], bids: [] };
+    this.data = { asks: {}, bids: {} };
     this.price = { asks: [], bids: [] };
-    this.subject.unsubscribe();
     this.currentDisplay = [];
     this.displayOrder.next([]);
   }
 
   send(message: CoinbaseMessage): void {
-    this.subject.next(message);
+    this.subject?.next(message);
   }
 
-  handleSnapshot(snapshot: Snapshot) {
-    this.buildData(snapshot['asks'], 'asks', true);
-    this.buildData(snapshot['bids'], 'bids', false);
-    this.displayOrder.next(this.currentDisplay);
+  closeConnection(): void {
+    if (!this.subject || this.subject.closed) {
+      return;
+    }
+    this.subject.complete();
   }
 
-  buildData(snap: number[][], action: string, actionBoolean: boolean) {
-    snap.forEach(
-      (v) =>
-        (this.data[action][Number(v[0])] = {
-          price: Number(v[0]),
-          size: Number(v[1]),
-          asks: actionBoolean
-        })
-    );
-    snap
-      .slice(0, 10)
-      .reverse()
-      .forEach((v) => {
-        this.price[action].push(Number(v[0]));
-        this.currentDisplay.push(
-          new DisplayOrder(Number(v[0]), Number(v[1]), actionBoolean)
-        );
-      });
+  handleMessage(message: CoinbaseLevel2Message): void {
+    message.events?.forEach((event) => {
+      if (!event.updates) {
+        return;
+      }
+
+      if (event.type === 'snapshot') {
+        this.handleSnapshot(event);
+      } else if (event.type === 'update') {
+        this.update(event);
+      }
+    });
   }
 
-  update(update: Update) {
-    const action = update.changes[0][0] == 'sell' ? 'asks' : 'bids';
-    const price = Number(update.changes[0][1]);
-    const size = Number(update.changes[0][2]);
-    // update data
-    if (size < 3.5e-7) {
+  handleSnapshot(snapshot: CoinbaseLevel2Event): void {
+    snapshot.updates.forEach((update) => this.applyUpdate(update));
+    this.displayOrderbook();
+  }
+
+  applyUpdate(update: CoinbaseLevel2Update): void {
+    const action = this.getOrderSide(update.side);
+    if (!action) {
+      return;
+    }
+
+    const price = Number(update.price_level);
+    const size = Number(update.new_quantity);
+    if (!Number.isFinite(price) || !Number.isFinite(size)) {
+      return;
+    }
+
+    if (size < MINIMUM_VISIBLE_SIZE) {
       delete this.data[action][price];
     } else {
       this.data[action][price] = {
@@ -145,26 +154,46 @@ export class CoinbaseService {
         asks: action === 'asks'
       };
     }
-    this.displayNewOrder(action);
   }
 
-  displayNewOrder(action: string) {
-    const keys: number[] = Object.keys(this.data[action])
+  update(update: CoinbaseLevel2Event): void {
+    update.updates.forEach((levelUpdate) => this.applyUpdate(levelUpdate));
+    this.displayOrderbook();
+  }
+
+  displayOrderbook(): void {
+    this.currentDisplay = [];
+    this.displayOrders('asks');
+    this.displayOrders('bids');
+    this.displayOrder.next(this.currentDisplay);
+  }
+
+  displayOrders(action: OrderSide): void {
+    const prices: number[] = Object.keys(this.data[action])
       .map(Number)
       .sort((a, b) => {
         return b - a;
       });
-    this.price[action] = action == 'asks' ? keys.slice(-10) : keys.slice(0, 10);
-    const index = action == 'asks' ? 0 : 10;
+
+    this.price[action] =
+      action === 'asks' ? prices.slice(-10).reverse() : prices.slice(0, 10);
     for (let i = 0; i < 10; i++) {
-      if (
-        this.data[action][this.price[action][i]] !==
-        this.currentDisplay[i + index]
-      ) {
-        this.currentDisplay[i + index] =
-          this.data[action][this.price[action][i]];
+      const order = this.data[action][this.price[action][i]];
+      if (order) {
+        this.currentDisplay.push(order);
       }
     }
-    this.displayOrder.next(this.currentDisplay);
+  }
+
+  private getOrderSide(side: string): OrderSide | undefined {
+    if (side === 'bid') {
+      return 'bids';
+    }
+
+    if (side === 'ask' || side === 'offer') {
+      return 'asks';
+    }
+
+    return undefined;
   }
 }
