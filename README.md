@@ -36,11 +36,25 @@ Among the main characteristics of an orderbook:
 
 ## How to use
 
-Run `ng serve` for a dev server. Navigate to `http://localhost:4200/`. The app will automatically reload if you change any of the source files.
+Install dependencies if needed:
+
+```sh
+npm install
+```
+
+Run the local Angular CLI through the npm script:
+
+```sh
+npm start
+```
+
+Navigate to `http://localhost:4200/`. The app will automatically reload if you change any of the source files.
+
+You do not need to install `ng` globally. If you want to call Angular CLI directly, use `npx ng serve`.
 
 #### Build
 
-Run `ng build` to build the project. The build artifacts will be stored in the `dist/` directory.
+Run `npm run build` to build the project. The build artifacts will be stored in the `dist/` directory.
 
 #### Running unit tests
 
@@ -48,7 +62,7 @@ Run `npm test` to execute the unit tests via Jest.
 
 #### Running end-to-end tests
 
-Run `ng e2e` to execute the end-to-end tests via a platform of your choice. To use this command, you need to first add a package that implements end-to-end testing capabilities.
+Run `npm run e2e` to execute the end-to-end tests via a platform of your choice. To use this command, you need to first add a package that implements end-to-end testing capabilities.
 
 
 
